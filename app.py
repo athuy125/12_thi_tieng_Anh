@@ -1,13 +1,15 @@
 import re
 import streamlit as st
-
+import unicodedata
 st.set_page_config(page_title="Luyện 12 thì Tiếng Anh", page_icon="📘", layout="centered")
 
-# ==========================
-# TIỆN ÍCH & TẬP DỮ LIỆU HỖ TRỢ
-# ==========================
+
 def norm(s: str) -> str:
-    return re.sub(r"\s+", " ", s.strip().lower())
+ 
+    s = s.lower().strip()
+    s = unicodedata.normalize("NFC", s)
+    s = re.sub(r"[^\w\s]", "", s)  
+    return s
 
 def any_match(text: str, patterns):
     t = norm(text)
@@ -16,7 +18,7 @@ def any_match(text: str, patterns):
             return True
     return False
 
-# Một tập nhỏ các V2/V3 bất quy tắc phổ biến để hỗ trợ kiểm tra ví dụ (không đòi hỏi tuyệt đối)
+
 IRREG = [
     ("go", "went", "gone"), ("eat", "ate", "eaten"), ("see", "saw", "seen"),
     ("write", "wrote", "written"), ("begin", "began", "begun"), ("come", "came", "come"),
@@ -35,7 +37,7 @@ IRREG = [
 V2_SET = set(v2 for _, v2, _ in IRREG)
 V3_SET = set(v3 for _, _, v3 in IRREG)
 
-# Heuristics kiểm tra ví dụ theo dấu hiệu hình thái/ trợ động từ (đơn giản – đủ dùng để tự học)
+
 def validate_example(tense_key: str, group: str, form: str, sent: str):
     """
     tense_key: mã thì nội bộ (present_simple, past_continuous, ...)
@@ -68,7 +70,7 @@ def validate_example(tense_key: str, group: str, form: str, sent: str):
 
     # Mỗi thì: đặt các quy tắc "điển hình" (affirm/neg/question)
     ok = False
-    hint = ""  # gợi ý vì sao sai
+    hint = ""  
 
     # ---- HIỆN TẠI ĐƠN
     if tense_key == "present_simple":
