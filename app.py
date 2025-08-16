@@ -5,7 +5,6 @@ st.set_page_config(page_title="Luyện 12 thì Tiếng Anh", page_icon="📘", l
 
 
 def norm(s: str) -> str:
- 
     s = s.lower().strip()
     s = unicodedata.normalize("NFC", s)
     s = re.sub(r"[^\w\s]", "", s)  
