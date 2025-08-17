@@ -5,27 +5,26 @@ st.set_page_config(page_title="Luyện 12 thì Tiếng Anh", page_icon="📘", l
 
 
 def norm(s: str) -> str:
-    """Chuẩn hóa: bỏ hoa/thường, gom khoảng trắng, chuẩn hóa dấu gạch chéo"""
+    """Chuẩn hoá thân thiện cho công thức: giữ / và -, coi + là khoảng trắng."""
     if s is None:
         return ""
     s = unicodedata.normalize("NFC", s).lower().strip()
-    s = re.sub(r"\s*/\s*", "/", s)     # gộp "do / does" -> "do/does"
-    s = s.replace("+", " ")            # coi "+" như khoảng trắng
-    s = re.sub(r"[()]", "", s)         # bỏ ngoặc
-    s = re.sub(r"[^\w\s/]", " ", s)    # bỏ ký tự lạ, giữ khoảng trắng và "/"
-    s = re.sub(r"\s+", " ", s).strip() # gộp nhiều space
+    s = s.replace("+", " ")              # "+" -> khoảng trắng
+    s = re.sub(r"[()]", " ", s)          # bỏ ngoặc
+    s = re.sub(r"\s*/\s*", " / ", s)     # chèn khoảng trắng quanh "/": am / is / are
+    s = re.sub(r"[^\w\s/\-]", " ", s)    # chỉ giữ chữ, số, khoảng trắng, "/", "-"
+    s = re.sub(r"\s+", " ", s).strip()   # gọn khoảng trắng
     return s
 
 def has_word(text: str, word: str) -> bool:
-    """Tìm từ theo ranh giới từ"""
     return re.search(rf"\b{re.escape(word)}\b", text) is not None
 
 def formula_ok(user_input: str, correct: str) -> bool:
     """
-    So khớp công thức linh hoạt theo từ khóa cốt lõi:
-    - Nhận các lựa chọn kiểu am/is/are, do/does, was/were, have/has
+    So khớp công thức linh hoạt theo từ khoá:
+    - Nhận am/is/are, do/does, was/were, have/has (chỉ cần 1 cái xuất hiện)
     - Nhận V(s/es), V-ing, V2/V-ed, V3
-    - Không nhạy khoảng trắng, dấu câu, hoa/thường
+    - Không phân biệt hoa/thường, dấu, khoảng trắng
     """
     u = norm(user_input)
     c = norm(correct)
@@ -34,66 +33,41 @@ def formula_ok(user_input: str, correct: str) -> bool:
     # 1) Nhóm lựa chọn (chỉ cần có 1)
     choice_groups = []
     if "do/does" in c_raw:
-        choice_groups.append(("do", "does"))
+        choice_groups.append(["do", "does"])
     if "am/is/are" in c_raw:
-        choice_groups.append(("am", "is", "are"))
+        choice_groups.append(["am", "is", "are"])
     if "was/were" in c_raw:
-        choice_groups.append(("was", "were"))
+        choice_groups.append(["was", "were"])
     if "have/has" in c_raw:
-        choice_groups.append(("have", "has"))
+        choice_groups.append(["have", "has"])
 
     for group in choice_groups:
         if not any(has_word(u, w) for w in group):
             return False
 
-    # 2) Từ khóa bắt buộc (nếu có trong công thức)
-    must_words = []
-    if re.search(r"\bs\b", c):        # có “S”
-        must_words.append("s")
-    if " not " in f" {c} ":           # có “not”
-        must_words.append("not")
+    # 2) Từ bắt buộc
+    if " not " in f" {c_raw} " and not has_word(u, "not"):
+        return False
+    if re.search(r"\bs\b", c) and not has_word(u, "s"):
+        return False
 
-    # Có “V” loại nào thì check loại đó
-    need_v_plain = bool(re.search(r"\bv\b", c)) and not any(t in c_raw for t in ["v(s/es)", "v-ing", "v2/v-ed", "v3"])
-    need_v_ses   = "v(s/es)" in c_raw
-    need_v_ing   = "v-ing" in c_raw
-    need_v2ed    = "v2/v-ed" in c_raw
-    need_v3      = "v3" in c_raw
-
-    for w in must_words:
-        if not has_word(u, w):
+    # 3) Dạng động từ
+    if "v(s/es)" in c_raw:
+        if not (has_word(u, "v") or re.search(r"\bv(s|es)\b", u)):
             return False
-
-    # 3) Kiểm tra dạng động từ
-    # V thường (chỉ 'v' trần)
-    if need_v_plain and not has_word(u, "v"):
+    if "v-ing" in c_raw:
+        if not (has_word(u, "ving") or re.search(r"\bv-?ing\b", u)):
+            return False
+    if "v2/v-ed" in c_raw:
+        if not (has_word(u, "v2") or has_word(u, "ved") or has_word(u, "v-ed")):
+            return False
+    if "v3" in c_raw and not has_word(u, "v3"):
         return False
-
-    # V(s/es)
-    if need_v_ses and not (has_word(u, "v") or re.search(r"\bv(s|es)\b", u)):
-        # chấp nhận "v", "vs", "ves"
-        return False
-
-    # V-ing
-    if need_v_ing and not (has_word(u, "ving") or re.search(r"\bv-?ing\b", u)):
-        return False
-
-    # V2 / V-ed
-    if need_v2ed and not (has_word(u, "v2") or has_word(u, "ved") or has_word(u, "v-ed")):
-        return False
-
-    # V3
-    if need_v3 and not has_word(u, "v3"):
+    # Trường hợp là "… + V" trần
+    if " v " in f" {c} " and not any(tag in u for tag in [" v", "v ", "v-", "v2", "ved", "v3"]):
         return False
 
     return True
-
-
-def norm(s: str) -> str:
-    s = s.lower().strip()
-    s = unicodedata.normalize("NFC", s)
-    s = re.sub(r"[^\w\s]", "", s)  
-    return s
 
 def any_match(text: str, patterns):
     t = norm(text)
