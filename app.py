@@ -552,19 +552,15 @@ st.divider()
 
 # --------- KIỂM TRA CÁCH DÙNG
 st.subheader("📌 Cách dùng (Uses)")
-for i, use in enumerate(tense["uses"], 1):
+for i, use in enumerate(tense["usages"], 1):
     key_use_in = f"use-{tense_key}-{i}"
     key_use_btn = f"btn-use-{tense_key}-{i}"
-    user_use = st.text_input(f"Cách dùng {i} (Use {i}):", key=key_use_in)
-
+    user_use = st.text_input(f"Cách dùng {i}:", key=key_use_in, placeholder="Nhập ý chính thôi cũng được")
     if st.button(f"Kiểm tra cách dùng {i}", key=key_use_btn):
-        nu, na = norm(user_use), norm(use)
-
-        # ✅ đúng nếu 1 trong 2 chứa nhau
-        if nu in na or na in nu:
-            st.success("✅ Chính xác!")
+        if usage_ok(user_use, [use]):
+            st.success("✅ Đúng ý!")
         else:
-            st.error(f"❌ Sai rồi! Gợi ý: {use}")
+            st.error(f"❌ Chưa khớp. Gợi ý: {use}")
 st.divider()
 
 # --------- KIỂM TRA DẤU HIỆU NHẬN BIẾT
