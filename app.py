@@ -5,6 +5,91 @@ st.set_page_config(page_title="Luyện 12 thì Tiếng Anh", page_icon="📘", l
 
 
 def norm(s: str) -> str:
+    """Chuẩn hóa: bỏ hoa/thường, gom khoảng trắng, chuẩn hóa dấu gạch chéo"""
+    if s is None:
+        return ""
+    s = unicodedata.normalize("NFC", s).lower().strip()
+    s = re.sub(r"\s*/\s*", "/", s)     # gộp "do / does" -> "do/does"
+    s = s.replace("+", " ")            # coi "+" như khoảng trắng
+    s = re.sub(r"[()]", "", s)         # bỏ ngoặc
+    s = re.sub(r"[^\w\s/]", " ", s)    # bỏ ký tự lạ, giữ khoảng trắng và "/"
+    s = re.sub(r"\s+", " ", s).strip() # gộp nhiều space
+    return s
+
+def has_word(text: str, word: str) -> bool:
+    """Tìm từ theo ranh giới từ"""
+    return re.search(rf"\b{re.escape(word)}\b", text) is not None
+
+def formula_ok(user_input: str, correct: str) -> bool:
+    """
+    So khớp công thức linh hoạt theo từ khóa cốt lõi:
+    - Nhận các lựa chọn kiểu am/is/are, do/does, was/were, have/has
+    - Nhận V(s/es), V-ing, V2/V-ed, V3
+    - Không nhạy khoảng trắng, dấu câu, hoa/thường
+    """
+    u = norm(user_input)
+    c = norm(correct)
+    c_raw = correct.lower()
+
+    # 1) Nhóm lựa chọn (chỉ cần có 1)
+    choice_groups = []
+    if "do/does" in c_raw:
+        choice_groups.append(("do", "does"))
+    if "am/is/are" in c_raw:
+        choice_groups.append(("am", "is", "are"))
+    if "was/were" in c_raw:
+        choice_groups.append(("was", "were"))
+    if "have/has" in c_raw:
+        choice_groups.append(("have", "has"))
+
+    for group in choice_groups:
+        if not any(has_word(u, w) for w in group):
+            return False
+
+    # 2) Từ khóa bắt buộc (nếu có trong công thức)
+    must_words = []
+    if re.search(r"\bs\b", c):        # có “S”
+        must_words.append("s")
+    if " not " in f" {c} ":           # có “not”
+        must_words.append("not")
+
+    # Có “V” loại nào thì check loại đó
+    need_v_plain = bool(re.search(r"\bv\b", c)) and not any(t in c_raw for t in ["v(s/es)", "v-ing", "v2/v-ed", "v3"])
+    need_v_ses   = "v(s/es)" in c_raw
+    need_v_ing   = "v-ing" in c_raw
+    need_v2ed    = "v2/v-ed" in c_raw
+    need_v3      = "v3" in c_raw
+
+    for w in must_words:
+        if not has_word(u, w):
+            return False
+
+    # 3) Kiểm tra dạng động từ
+    # V thường (chỉ 'v' trần)
+    if need_v_plain and not has_word(u, "v"):
+        return False
+
+    # V(s/es)
+    if need_v_ses and not (has_word(u, "v") or re.search(r"\bv(s|es)\b", u)):
+        # chấp nhận "v", "vs", "ves"
+        return False
+
+    # V-ing
+    if need_v_ing and not (has_word(u, "ving") or re.search(r"\bv-?ing\b", u)):
+        return False
+
+    # V2 / V-ed
+    if need_v2ed and not (has_word(u, "v2") or has_word(u, "ved") or has_word(u, "v-ed")):
+        return False
+
+    # V3
+    if need_v3 and not has_word(u, "v3"):
+        return False
+
+    return True
+
+
+def norm(s: str) -> str:
     s = s.lower().strip()
     s = unicodedata.normalize("NFC", s)
     s = re.sub(r"[^\w\s]", "", s)  
@@ -464,10 +549,11 @@ for group, formulas in tense["summary"].items():
         key_btn = f"btn-formula-{tense_key}-{group}-{form}"
         user_input = st.text_input(f"{form} – nhập công thức (Enter formula):", key=key_input)
         if st.button(f"Kiểm tra {form}", key=key_btn):
-            if norm(user_input) == norm(correct):
+            if formula_ok(user_input, correct):
                 st.success("✅ Chính xác!")
             else:
-                st.error(f"❌ Sai rồi! Đúng là: {correct}")
+                st.error(f"❌ Sai rồi! Gợi ý: {correct}")
+
 
 st.divider()
 
