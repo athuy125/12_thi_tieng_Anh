@@ -3,6 +3,25 @@ import streamlit as st
 import unicodedata
 st.set_page_config(page_title="Luyện 12 thì Tiếng Anh", page_icon="📘", layout="centered")
 
+def usage_ok(user_input: str, correct_usages: list[str]) -> bool:
+    """
+    Kiểm tra cách dùng dựa trên từ khóa thay vì so khớp toàn bộ câu.
+    - user_input: người dùng nhập
+    - correct_usages: danh sách đáp án mẫu (chuẩn)
+    """
+    text = norm(user_input)
+
+    for usage in correct_usages:
+        usage_norm = norm(usage)
+
+        # lấy từ khóa quan trọng trong đáp án mẫu
+        keywords = [w for w in usage_norm.split() if len(w) > 2]
+
+        # chỉ cần user_input chứa >= 1 từ khóa quan trọng
+        if any(k in text for k in keywords):
+            return True
+
+    return False
 
 def norm(s: str) -> str:
     """Chuẩn hoá thân thiện cho công thức: giữ / và -, coi + là khoảng trắng."""
